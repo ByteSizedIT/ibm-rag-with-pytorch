@@ -113,3 +113,11 @@ Model	Needs device management?	Why it looks different
 BERT	Yes	You manually create PyTorch tensors and must place them manually.
 DPRContextEncoder	Yes	Examples usually run on CPU or use helpers that auto-move inputs.
 '''
+# load the BERT model and move it to the same device as the input tensors
+from transformers import BertModel
+bert_model = BertModel.from_pretrained('bert-base-uncased')
+bert_model.to(DEVICE)
+
+# use model to processes inputs & generate embeddings
+word_embedding=bert_model(input_ids_tensors,mask_tensors)
+print("Word Embeddings: /n", word_embedding)
