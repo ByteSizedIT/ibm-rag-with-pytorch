@@ -32,3 +32,84 @@ For BERT (bert-base-uncased):
 [CLS] — classification token added at the start
 [SEP] — separator token added at the end (and between sentences if there are two)
 '''
+
+# text decoding and verification - after tokenization, the script below decodes the first tokenized input back to text to check the correctness and length of the tokenization process (incl special chars)
+text=tokenizer.decode(input_ids['input_ids'][0])
+print("decoded text: \n", text)
+print(f"text length {len(text.split())}")
+
+print('attention_mask', input_ids['attention_mask'])
+
+'''
+When using the BERT tokenizer, the output includes key components that are essential for the model's processing:
+
+input_ids: A list of token IDs that represent each token in BERT's vocabulary.
+
+token_type_ids: Indicates which sentence each token belongs to, important for tasks involving sentence pairs.
+
+attention_mask: Identifies which tokens should be focused on, differentiating real content from padding.
+
+Special tokens:
+
+[CLS]: Placed at the start of every input for use in classification tasks.
+
+[SEP]: Separates sentences in dual-sentence tasks and marks the end of input sequences.
+
+EXAMPLE:
+ {'input_ids': [[101, 2023, 2003, 2019, 2742, 6251, 2005, 14324, 7861, 8270, 4667, 2015, 1012, 102, 2129, 2079, 2017, 2066, 2009, 102], [101, 2045, 2024, 2060, 4275, 102, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'token_type_ids': [[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1], [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]], 'attention_mask': [[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1], [1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]]}
+'''
+
+
+# Device and Convert Tensor
+'''Here, you are going to convert the token IDs and attention masks into PyTorch tensors and transfers them to a computing device (DEVICE) for input into BERT. This device should be defined elsewhere in the script (typically as "cuda" for GPU or "cpu").'''
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("DEVICE: ", DEVICE)
+# nb you can check thisin the command line: python -c "import torch; print(torch.cuda.is_available())" ; If you installed the CPU-only version of PyTorch, it will always return False, even if your machine has a GPU.
+
+input_ids_tensors = torch.tensor(input_ids['input_ids']).to(DEVICE)
+mask_tensors = torch.tensor(input_ids['attention_mask']).to(DEVICE)
+
+'''
+✅ Why DPRContextEncoder appears not to require it
+When using DPR context encoders, most examples look like this:
+from transformers import DPRContextEncoder, DPRContextEncoderTokenizer
+
+tokenizer = DPRContextEncoderTokenizer.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base")
+model = DPRContextEncoder.from_pretrained("facebook/dpr-ctx_encoder-single-nq-base")
+
+inputs = tokenizer("text here", return_tensors="pt")
+embeddings = model(**inputs).pooler_output
+Notice:
+The tokenizer returns tensors already (return_tensors="pt"), so you skip creating them manually.
+If you put the model on a device:
+model.to(DEVICE)
+inputs = {k: v.to(DEVICE) for k,v in inputs.items()}
+Then everything matches.
+
+
+In most tutorials, either:
+✔ The model is left on CPU → so there's no need for .to(DEVICE)
+or
+✔ They hide the device move using a helper like:
+inputs = inputs.to(DEVICE)
+or sometimes:
+inputs = tokenizer(..., return_tensors="pt").to(DEVICE)
+So DPR doesn’t magically avoid device management — it just uses higher-level abstractions that hide the step.
+
+input_ids_tensors = torch.tensor(input_ids['input_ids']).to(DEVICE)
+mask_tensors = torch.tensor(input_ids['attention_mask']).to(DEVICE)
+BERT and DPR both require matching the device of the inputs and the model.
+The only difference is that your BERT code:
+creates tensors manually
+so you are forced to .to(DEVICE) manually.
+DPR tutorials:
+use return_tensors="pt"
+often run the model on CPU
+or use inputs that already know how to move themselves to the device (e.g., batch.to(device) in Trainer API)
+So it looks like DPR doesn't need it — but it still does under the hood.
+✅ TL;DR
+Model	Needs device management?	Why it looks different
+BERT	Yes	You manually create PyTorch tensors and must place them manually.
+DPRContextEncoder	Yes	Examples usually run on CPU or use helpers that auto-move inputs.
+'''
